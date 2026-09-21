@@ -152,6 +152,26 @@ jobs:
           # syscall work bits rather than the removed TIF_SECCOMP flag.
           sed -i 's/test_thread_flag(TIF_SECCOMP)/test_syscall_work(SECCOMP)/g' "$APP_PROFILE"
 
+      - name: Fix KernelSU-Next SELinux helper linkage
+        if: ${{ inputs.ksu_variant == 'KernelSU-Next' && steps.parse.outputs.android_version == 'android15' && steps.parse.outputs.kernel_version == '6.6' }}
+        working-directory: ${{ github.workspace }}/kernel
+        shell: bash
+        run: |
+          set -euo pipefail
+          SELINUX_HIDE="$GITHUB_WORKSPACE/kernel/KernelSU-Next/kernel/feature/selinux_hide.c"
+          test -f "$SELINUX_HIDE"
+
+          # SUSFS's Android 15 common-kernel hooks call these helpers from
+          # security/selinux/*.c. KernelSU-Next owns their implementations,
+          # so they must have external linkage for the final vmlinux link.
+          sed -i 's/^static int security_context_to_sid_with_policy(/int security_context_to_sid_with_policy(/' "$SELINUX_HIDE"
+          sed -i 's/^static int security_sid_to_context_with_policy(/int security_sid_to_context_with_policy(/' "$SELINUX_HIDE"
+          sed -i 's/^static void __nocfi security_compute_av_user_with_policy(/void __nocfi security_compute_av_user_with_policy(/' "$SELINUX_HIDE"
+
+          grep -q '^int security_context_to_sid_with_policy(' "$SELINUX_HIDE"
+          grep -q '^int security_sid_to_context_with_policy(' "$SELINUX_HIDE"
+          grep -q '^void __nocfi security_compute_av_user_with_policy(' "$SELINUX_HIDE"
+
       - name: Integrate SUSFS for Android 15 6.6
         if: ${{ inputs.ksu_variant == 'KernelSU-Next' && steps.parse.outputs.android_version == 'android15' && steps.parse.outputs.kernel_version == '6.6' }}
         working-directory: ${{ github.workspace }}/kernel
