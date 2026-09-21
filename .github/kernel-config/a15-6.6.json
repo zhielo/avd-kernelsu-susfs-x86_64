@@ -1,5 +1,6 @@
 {
   "include": [
-    {"kernel_version": "6.6.118-android15-2026-01"}
+    {"kernel_version": "6.6.50-android15-2024-10"}
   ]
 }
+
