@@ -22,6 +22,7 @@ runs:
         for cfg in \
           CONFIG_VIRTIO \
           CONFIG_VIRTIO_PCI \
+          CONFIG_VIRTIO_PCI_MODERN_DEV \
           CONFIG_VIRTIO_PCI_LEGACY \
           CONFIG_VIRTIO_MMIO \
           CONFIG_VIRTIO_BLK \
@@ -45,8 +46,16 @@ runs:
           # Strip CONFIG_ prefix to get Kconfig symbol name
           SYM="${cfg#CONFIG_}"
           if grep -rq "^config $SYM$" "$KERNEL_SRC" 2>/dev/null; then
-            echo "${cfg}=y" >> "$FRAG"
-            echo "  Added: ${cfg}=y"
+            case "$cfg" in
+              CONFIG_VIRTIO_BLK|CONFIG_VIRTIO_PCI|CONFIG_VIRTIO_PCI_MODERN_DEV|CONFIG_VIRTIO_CONSOLE|CONFIG_VIRTIO_BALLOON|CONFIG_VIRTIO_VSOCKETS)
+                value=m
+                ;;
+              *)
+                value=y
+                ;;
+            esac
+            echo "${cfg}=${value}" >> "$FRAG"
+            echo "  Added: ${cfg}=${value}"
           else
             echo "  Skipped (not in Kconfig): ${cfg}"
           fi
@@ -62,3 +71,4 @@ runs:
             cp "$FRAG" "$dir/gki.fragment"
           fi
         done
+
