@@ -134,10 +134,43 @@ jobs:
           ksu_variant: ${{ inputs.ksu_variant }}
           ksu_commit: ${{ inputs.ksu_commit }}
 
+      - name: Integrate SUSFS for Android 15 6.6
+        if: ${{ inputs.ksu_variant == 'KernelSU-Next' && steps.parse.outputs.android_version == 'android15' && steps.parse.outputs.kernel_version == '6.6' }}
+        working-directory: ${{ github.workspace }}/kernel
+        run: |
+          set -euo pipefail
+          git clone --depth=1 --branch gki-android15-6.6 https://gitlab.com/simonpunk/susfs4ksu.git "$GITHUB_WORKSPACE/susfs4ksu"
+
+          # KernelSU-Next dev-susfs already contains the KSU-side SUSFS calls.
+          # Add the matching Android 15/6.6 VFS hooks and SUSFS headers.
+          cp "$GITHUB_WORKSPACE/susfs4ksu/kernel_patches/fs/susfs.c" common/fs/
+          cp "$GITHUB_WORKSPACE/susfs4ksu/kernel_patches/include/linux/"* common/include/linux/
+          cd common
+          patch -p1 < "$GITHUB_WORKSPACE/susfs4ksu/kernel_patches/50_add_susfs_in_gki-android15-6.6.patch"
+
       - name: Configure Kernel Options
         uses: ./.github/actions/configure-kernel
         with:
           kernel_version: ${{ steps.parse.outputs.kernel_version }}
+
+      - name: Enable KernelSU and SUSFS config
+        if: ${{ inputs.ksu_variant == 'KernelSU-Next' && steps.parse.outputs.android_version == 'android15' && steps.parse.outputs.kernel_version == '6.6' }}
+        shell: bash
+        run: |
+          cat >> "$GITHUB_WORKSPACE/gki.fragment" << 'EOF'
+          CONFIG_KSU=y
+          CONFIG_KSU_SUSFS=y
+          CONFIG_KSU_SUSFS_SUS_PATH=y
+          CONFIG_KSU_SUSFS_SUS_MOUNT=y
+          CONFIG_KSU_SUSFS_SUS_KSTAT=y
+          CONFIG_KSU_SUSFS_SPOOF_UNAME=y
+          CONFIG_KSU_SUSFS_ENABLE_LOG=y
+          CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y
+          CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y
+          CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
+          CONFIG_KSU_SUSFS_SUS_MAP=y
+          CONFIG_KSU_X86_PATCH_SYSCALL_DISPATCHER=n
+          EOF
 
       - name: Clean Kernel Flags
         uses: ./.github/actions/clean-flags
@@ -316,3 +349,4 @@ jobs:
           echo "Architecture        : ${{ inputs.arch }}"
           echo "Patch Level         : $OS_PATCH_LEVEL"
           echo "${KSU_VARIANT:-KernelSU-Next}  : ${KSU_GIT_TAG:-N/A} (${KSU_COMMIT:-N/A})"
+
