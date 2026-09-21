@@ -134,6 +134,18 @@ jobs:
           ksu_variant: ${{ inputs.ksu_variant }}
           ksu_commit: ${{ inputs.ksu_commit }}
 
+      - name: Fix KernelSU-Next compat type include
+        if: ${{ inputs.ksu_variant == 'KernelSU-Next' }}
+        working-directory: ${{ github.workspace }}/kernel
+        shell: bash
+        run: |
+          set -euo pipefail
+          KSUD_HEADER="$GITHUB_WORKSPACE/kernel/KernelSU-Next/kernel/runtime/ksud.h"
+          test -f "$KSUD_HEADER"
+          if grep -q 'compat_uptr_t' "$KSUD_HEADER" && ! grep -qxF '#include <linux/compat.h>' "$KSUD_HEADER"; then
+            sed -i '/^#include <asm\/syscall.h>$/a #include <linux/compat.h>' "$KSUD_HEADER"
+          fi
+
       - name: Integrate SUSFS for Android 15 6.6
         if: ${{ inputs.ksu_variant == 'KernelSU-Next' && steps.parse.outputs.android_version == 'android15' && steps.parse.outputs.kernel_version == '6.6' }}
         working-directory: ${{ github.workspace }}/kernel
