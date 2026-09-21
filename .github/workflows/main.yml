@@ -79,8 +79,8 @@ jobs:
               DEFAULT_REF="refs/heads/main"
               ;;
             KernelSU-Next)
-              REPO_URL="https://github.com/KernelSU-Next/KernelSU-Next.git"
-              DEFAULT_REF="refs/heads/next"
+              REPO_URL="https://github.com/pershoot/KernelSU-Next.git"
+              DEFAULT_REF="refs/heads/dev-susfs"
               ;;
             SukiSU-Ultra)
               REPO_URL="https://github.com/SukiSU-Ultra/SukiSU-Ultra.git"
@@ -113,7 +113,7 @@ jobs:
       arch: x86_64
       ksu_variant: ${{ needs.fetch-commits.outputs.ksu_variant }}
       ksu_commit: ${{ needs.fetch-commits.outputs.ksu_commit }}
-      build_modules: ${{ inputs.build_modules || true }}
+      build_modules: ${{ inputs.build_modules }}
     secrets: inherit
 
   # Android 14 - Kernel 6.1 (aarch64)
@@ -126,7 +126,7 @@ jobs:
       arch: aarch64
       ksu_variant: ${{ needs.fetch-commits.outputs.ksu_variant }}
       ksu_commit: ${{ needs.fetch-commits.outputs.ksu_commit }}
-      build_modules: ${{ inputs.build_modules || true }}
+      build_modules: ${{ inputs.build_modules }}
     secrets: inherit
 
   # ──────────────────────────────────────────────
@@ -141,7 +141,7 @@ jobs:
       arch: x86_64
       ksu_variant: ${{ needs.fetch-commits.outputs.ksu_variant }}
       ksu_commit: ${{ needs.fetch-commits.outputs.ksu_commit }}
-      build_modules: ${{ inputs.build_modules || true }}
+      build_modules: ${{ inputs.build_modules }}
     secrets: inherit
 
   # Android 15 - Kernel 6.6 (aarch64)
@@ -154,7 +154,7 @@ jobs:
       arch: aarch64
       ksu_variant: ${{ needs.fetch-commits.outputs.ksu_variant }}
       ksu_commit: ${{ needs.fetch-commits.outputs.ksu_commit }}
-      build_modules: ${{ inputs.build_modules || true }}
+      build_modules: ${{ inputs.build_modules }}
     secrets: inherit
 
   # ──────────────────────────────────────────────
@@ -169,7 +169,7 @@ jobs:
       arch: x86_64
       ksu_variant: ${{ needs.fetch-commits.outputs.ksu_variant }}
       ksu_commit: ${{ needs.fetch-commits.outputs.ksu_commit }}
-      build_modules: ${{ inputs.build_modules || true }}
+      build_modules: ${{ inputs.build_modules }}
     secrets: inherit
 
   # Android 16 - Kernel 6.12 (aarch64)
@@ -182,7 +182,7 @@ jobs:
       arch: aarch64
       ksu_variant: ${{ needs.fetch-commits.outputs.ksu_variant }}
       ksu_commit: ${{ needs.fetch-commits.outputs.ksu_commit }}
-      build_modules: ${{ inputs.build_modules || true }}
+      build_modules: ${{ inputs.build_modules }}
     secrets: inherit
 
   # ──────────────────────────────────────────────
@@ -295,3 +295,4 @@ jobs:
           draft: false
           prerelease: ${{ github.event_name == 'workflow_dispatch' && inputs.release_type == 'Pre-Release' }}
           files: release-assets/*.zip
+
