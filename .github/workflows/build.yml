@@ -139,14 +139,44 @@ jobs:
         working-directory: ${{ github.workspace }}/kernel
         run: |
           set -euo pipefail
-          git clone --depth=1 --branch gki-android15-6.6 https://gitlab.com/simonpunk/susfs4ksu.git "$GITHUB_WORKSPACE/susfs4ksu"
+          SUSFS_COMMIT="9d9464f191b2d846590ac4d1b52e123df135c401"
+          git clone --no-checkout https://gitlab.com/simonpunk/susfs4ksu.git "$GITHUB_WORKSPACE/susfs4ksu"
+          git -C "$GITHUB_WORKSPACE/susfs4ksu" fetch --depth=1 origin "$SUSFS_COMMIT"
+          git -C "$GITHUB_WORKSPACE/susfs4ksu" checkout --detach "$SUSFS_COMMIT"
 
           # KernelSU-Next dev-susfs already contains the KSU-side SUSFS calls.
           # Add the matching Android 15/6.6 VFS hooks and SUSFS headers.
           cp "$GITHUB_WORKSPACE/susfs4ksu/kernel_patches/fs/susfs.c" common/fs/
           cp "$GITHUB_WORKSPACE/susfs4ksu/kernel_patches/include/linux/"* common/include/linux/
+
+          # SUSFS's 6.6 patch uses these headers as context for older GKI
+          # sublevels. They are temporary compatibility anchors only.
+          if [ "$SUB_LEVEL" -le 92 ] && ! grep -qxF '#include <linux/dma-buf.h>' common/fs/proc/base.c; then
+            grep -qxF '#include <linux/cpufreq_times.h>' common/fs/proc/base.c
+            sed -i '/^#include <linux\/cpufreq_times.h>$/a #include <linux/dma-buf.h>' common/fs/proc/base.c
+          fi
+          if [ "$SUB_LEVEL" -le 57 ] && ! grep -qxF '#include <linux/zswap.h>' common/mm/memory.c; then
+            grep -qxF '#include <linux/sched/sysctl.h>' common/mm/memory.c
+            sed -i '/^#include <linux\/sched\/sysctl.h>$/a #include <linux\/zswap.h>' common/mm/memory.c
+          fi
+
           cd common
           patch -p1 < "$GITHUB_WORKSPACE/susfs4ksu/kernel_patches/50_add_susfs_in_gki-android15-6.6.patch"
+
+          if find . -name '*.rej' -print -quit | grep -q .; then
+            echo "ERROR: SUSFS patch rejects remain" >&2
+            find . -name '*.rej' -print >&2
+            exit 1
+          fi
+
+          # Remove only the temporary context anchors after the patch has
+          # applied. This matches the maintained SUSFS Android 15 workflow.
+          if [ "$SUB_LEVEL" -le 92 ]; then
+            sed -i '/^#include <linux\/dma-buf.h>$/d' fs/proc/base.c
+          fi
+          if [ "$SUB_LEVEL" -le 57 ]; then
+            sed -i '/^#include <linux\/zswap.h>$/d' mm/memory.c
+          fi
 
       - name: Configure Kernel Options
         uses: ./.github/actions/configure-kernel
@@ -169,7 +199,7 @@ jobs:
           CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y
           CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
           CONFIG_KSU_SUSFS_SUS_MAP=y
-          CONFIG_KSU_X86_PATCH_SYSCALL_DISPATCHER=n
+          CONFIG_KSU_X86_PATCH_SYSCALL_DISPATCHER=y
           EOF
 
       - name: Clean Kernel Flags
@@ -215,7 +245,7 @@ jobs:
             # Step 2: Build virtual device modules (uses same kernel, produces matching .ko files)
             SKIP_MRPROPER=1 LTO=thin \
               GKI_DEFCONFIG_FRAGMENT="$GITHUB_WORKSPACE/gki.fragment" \
-              BUILD_CONFIG="$VIRT_CONFIG" build/build.sh || echo "WARNING: Virtual device modules build failed"
+              BUILD_CONFIG="$VIRT_CONFIG" build/build.sh || exit 1
 
             # Find the actual dist output directory
             DIST_OUT=$(find "$GITHUB_WORKSPACE/kernel/out" -name "dist" -type d | head -1)
@@ -249,7 +279,7 @@ jobs:
                 --lto=thin \
                 --defconfig_fragment=${DEFCONFIG_FRAG} \
                 ${VIRT_TARGET} \
-                -- --dist_dir=dist_virt || echo "WARNING: Virtual device modules build failed"
+                -- --dist_dir=dist_virt || exit 1
             fi
           fi
 
@@ -319,6 +349,20 @@ jobs:
           # Remove empty modules dir if no modules found
           rmdir "$OUT_DIR/modules" 2>/dev/null || true
 
+          # Do not publish an artifact that cannot be boot-tested. A kernel is
+          # mandatory; virtual-device modules or system_dlkm output are needed
+          # for the AVD's matching virtio devices.
+          if [ ! -f "$OUT_DIR/bzImage" ] && [ ! -f "$OUT_DIR/Image" ]; then
+            echo "ERROR: no kernel image was produced" >&2
+            exit 1
+          fi
+          MODULE_COUNT=$(find "$OUT_DIR/modules" -maxdepth 1 -name '*.ko' 2>/dev/null | wc -l)
+          SYSTEM_DLKM_COUNT=$(find "$OUT_DIR" -maxdepth 1 -name 'system_dlkm*' 2>/dev/null | wc -l)
+          if [ "$MODULE_COUNT" -eq 0 ] && [ "$SYSTEM_DLKM_COUNT" -eq 0 ]; then
+            echo "ERROR: no virtual-device modules or system_dlkm artifact was produced" >&2
+            exit 1
+          fi
+
           echo "=== Final artifact contents ==="
           ls -la "$OUT_DIR/"
           echo "=== Modules ==="
@@ -338,7 +382,7 @@ jobs:
         with:
           name: ${{ steps.extract.outputs.file_name }}
           path: ${{ github.workspace }}/output/**
-          if-no-files-found: warn
+          if-no-files-found: error
           compression-level: 9
 
       - name: Build Summary
