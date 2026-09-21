@@ -164,13 +164,25 @@ jobs:
           # SUSFS's Android 15 common-kernel hooks call these helpers from
           # security/selinux/*.c. KernelSU-Next owns their implementations,
           # so they must have external linkage for the final vmlinux link.
-          sed -i 's/^static int security_context_to_sid_with_policy(/int security_context_to_sid_with_policy(/' "$SELINUX_HIDE"
-          sed -i 's/^static int security_sid_to_context_with_policy(/int security_sid_to_context_with_policy(/' "$SELINUX_HIDE"
-          sed -i 's/^static void __nocfi security_compute_av_user_with_policy(/void __nocfi security_compute_av_user_with_policy(/' "$SELINUX_HIDE"
+          sed -E -i 's/^[[:space:]]*static[[:space:]]+int[[:space:]]+security_context_to_sid_with_policy\(/int security_context_to_sid_with_policy(/' "$SELINUX_HIDE"
+          sed -E -i 's/^[[:space:]]*static[[:space:]]+int[[:space:]]+security_sid_to_context_with_policy\(/int security_sid_to_context_with_policy(/' "$SELINUX_HIDE"
+          sed -E -i 's/^[[:space:]]*static[[:space:]]+void[[:space:]]+(__nocfi[[:space:]]+)?security_compute_av_user_with_policy\(/void \1security_compute_av_user_with_policy(/' "$SELINUX_HIDE"
 
-          grep -q '^int security_context_to_sid_with_policy(' "$SELINUX_HIDE"
-          grep -q '^int security_sid_to_context_with_policy(' "$SELINUX_HIDE"
-          grep -q '^void __nocfi security_compute_av_user_with_policy(' "$SELINUX_HIDE"
+          if grep -Eq '^[[:space:]]*static[[:space:]]+int[[:space:]]+security_context_to_sid_with_policy\(' "$SELINUX_HIDE"; then
+            echo "ERROR: security_context_to_sid_with_policy remains static" >&2
+            exit 1
+          fi
+          if grep -Eq '^[[:space:]]*static[[:space:]]+int[[:space:]]+security_sid_to_context_with_policy\(' "$SELINUX_HIDE"; then
+            echo "ERROR: security_sid_to_context_with_policy remains static" >&2
+            exit 1
+          fi
+          if grep -Eq '^[[:space:]]*static[[:space:]]+void[[:space:]]+(__nocfi[[:space:]]+)?security_compute_av_user_with_policy\(' "$SELINUX_HIDE"; then
+            echo "ERROR: security_compute_av_user_with_policy remains static" >&2
+            exit 1
+          fi
+          grep -Eq '^[[:space:]]*int[[:space:]]+security_context_to_sid_with_policy\(' "$SELINUX_HIDE"
+          grep -Eq '^[[:space:]]*int[[:space:]]+security_sid_to_context_with_policy\(' "$SELINUX_HIDE"
+          grep -Eq '^[[:space:]]*void[[:space:]]+(__nocfi[[:space:]]+)?security_compute_av_user_with_policy\(' "$SELINUX_HIDE"
 
       - name: Integrate SUSFS for Android 15 6.6
         if: ${{ inputs.ksu_variant == 'KernelSU-Next' && steps.parse.outputs.android_version == 'android15' && steps.parse.outputs.kernel_version == '6.6' }}
