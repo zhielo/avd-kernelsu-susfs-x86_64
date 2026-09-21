@@ -23,7 +23,6 @@ runs:
           CONFIG_VIRTIO \
           CONFIG_VIRTIO_PCI \
           CONFIG_VIRTIO_PCI_MODERN_DEV \
-          CONFIG_VIRTIO_PCI_LEGACY \
           CONFIG_VIRTIO_MMIO \
           CONFIG_VIRTIO_BLK \
           CONFIG_VIRTIO_NET \
@@ -60,6 +59,14 @@ runs:
             echo "  Skipped (not in Kconfig): ${cfg}"
           fi
         done
+
+        # The stock Android 15 x86_64 AVD config disables transitional/legacy
+        # PCI transport. Leaving it enabled creates virtio_pci_legacy_dev.ko,
+        # which is not part of this kernel branch's declared module set.
+        if grep -rq '^config VIRTIO_PCI_LEGACY$' "$KERNEL_SRC" 2>/dev/null; then
+          echo '# CONFIG_VIRTIO_PCI_LEGACY is not set' >> "$FRAG"
+          echo '  Added: CONFIG_VIRTIO_PCI_LEGACY is not set'
+        fi
 
         echo "=== Final GKI Fragment ==="
         cat "$FRAG"
