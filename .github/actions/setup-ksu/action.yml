@@ -28,6 +28,7 @@ runs:
             # Use the SUSFS-enabled KernelSU-Next fork. The upstream next branch
             # does not provide the Android 15/6.6 SUSFS integration we need.
             SETUP_URL="https://raw.githubusercontent.com/pershoot/KernelSU-Next/dev-susfs/kernel/setup.sh"
+            KSU_NEXT_COMMIT="${COMMIT:-0c7d4efc8554df1753332cfff328fa9282915ae6}"
             KSU_DIR="KernelSU-Next"
             ;;
           SukiSU-Ultra)
@@ -42,11 +43,11 @@ runs:
 
         echo "Setting up $VARIANT..."
         if [ "$VARIANT" = "KernelSU-Next" ]; then
-          # The normal commit resolver points at upstream KernelSU-Next. For
-          # SUSFS, pin the compatible branch in the fork instead.
-          curl -LSs "$SETUP_URL" | bash -s dev-susfs
+          # Pin the SUSFS-compatible fork to a reviewed commit. The setup
+          # script accepts a commit or tag and preserves its integration edits.
+          curl -LSs "$SETUP_URL" | bash -s "$KSU_NEXT_COMMIT"
         else
-          curl -LSs "$SETUP_URL" | bash -s $COMMIT
+          curl -LSs "$SETUP_URL" | bash -s "$COMMIT"
         fi
 
         echo "KSU_DIR=$KSU_DIR" >> $GITHUB_ENV
