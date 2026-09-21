@@ -252,6 +252,41 @@ jobs:
           CONFIG_KSU_X86_PATCH_SYSCALL_DISPATCHER=y
           EOF
 
+      - name: Align AVD virtual-device module config
+        if: ${{ inputs.build_modules && steps.parse.outputs.android_version == 'android15' && steps.parse.outputs.kernel_version == '6.6' && inputs.arch == 'x86_64' }}
+        working-directory: ${{ github.workspace }}/kernel
+        shell: bash
+        run: |
+          set -euo pipefail
+          VIRT_FRAGMENT="$GITHUB_WORKSPACE/kernel/common-modules/virtual-device/virtual_device_core.fragment"
+          test -f "$VIRT_FRAGMENT"
+
+          # The virtual-device target declares these as module outputs. Its
+          # fragment is merged after the GKI fragment, so force the AVD-only
+          # drivers to m here rather than allowing the base fragment/defaults
+          # to leave them built-in or unset.
+          cat >> "$VIRT_FRAGMENT" << 'EOF'
+          CONFIG_FAILOVER=m
+          CONFIG_NET_FAILOVER=m
+          CONFIG_DRM_VIRTIO_GPU=m
+          CONFIG_HW_RANDOM_VIRTIO=m
+          CONFIG_VIRTIO_DMA_SHARED_BUFFER=m
+          CONFIG_VIRTIO_INPUT=m
+          CONFIG_VIRTIO_NET=m
+          CONFIG_VIRTIO_PCI_LIB_LEGACY=m
+          CONFIG_SND_VIRTIO=m
+          EOF
+
+          grep -q '^CONFIG_FAILOVER=m$' "$VIRT_FRAGMENT"
+          grep -q '^CONFIG_NET_FAILOVER=m$' "$VIRT_FRAGMENT"
+          grep -q '^CONFIG_DRM_VIRTIO_GPU=m$' "$VIRT_FRAGMENT"
+          grep -q '^CONFIG_HW_RANDOM_VIRTIO=m$' "$VIRT_FRAGMENT"
+          grep -q '^CONFIG_VIRTIO_DMA_SHARED_BUFFER=m$' "$VIRT_FRAGMENT"
+          grep -q '^CONFIG_VIRTIO_INPUT=m$' "$VIRT_FRAGMENT"
+          grep -q '^CONFIG_VIRTIO_NET=m$' "$VIRT_FRAGMENT"
+          grep -q '^CONFIG_VIRTIO_PCI_LIB_LEGACY=m$' "$VIRT_FRAGMENT"
+          grep -q '^CONFIG_SND_VIRTIO=m$' "$VIRT_FRAGMENT"
+
       - name: Clean Kernel Flags
         uses: ./.github/actions/clean-flags
 
